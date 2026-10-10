@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>كتالوج الأدوية</title>
+  <style>
+    :root {
+      --bg:#f1f5f9; --panel:#ffffff; --ink:#0f172a; --muted:#64748b;
+      --border:#e2e8f0; --accent:#0d9488; --accent-d:#0f766e;
+      --accent2:#2563eb; --green:#059669; --row:#f8fafc; --shadow:0 1px 3px rgba(0,0,0,.08);
+    }
+    * { box-sizing:border-box; }
+    html, body { height:100%; }
+    body { margin:0; font-family:"Segoe UI",Tahoma,sans-serif; background:var(--bg); color:var(--ink);
+           height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+    header { background:linear-gradient(135deg,var(--accent),var(--accent2));
+             color:#fff; padding:16px 28px; box-shadow:var(--shadow); flex:none; }
+    header h1 { margin:0; font-size:21px; display:flex; align-items:center; gap:10px; }
+    header p { margin:3px 0 0; opacity:.85; font-size:13px; }
+
+    .wrap { max-width:1200px; width:100%; margin:0 auto; padding:16px 22px;
+            flex:1; min-height:0; display:flex; flex-direction:column; }
+
+    /* بطاقات الإحصائيات */
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+             gap:12px; margin-bottom:14px; flex:none; }
+    .stat { background:var(--panel); border:1px solid var(--border); border-radius:12px;
+            padding:12px 16px; box-shadow:var(--shadow); }
+    .stat .n { font-size:24px; font-weight:700; color:var(--accent-d); }
+    .stat .l { font-size:13px; color:var(--muted); margin-top:2px; }
+
+    /* شريط الأدوات */
+    .toolbar { background:var(--panel); border:1px solid var(--border); border-radius:12px;
+               padding:12px 16px; box-shadow:var(--shadow); display:flex; flex-wrap:wrap;
+               gap:12px; align-items:center; margin-bottom:12px; flex:none; }
+    .field { display:flex; flex-direction:column; gap:4px; }
+    .field label { font-size:12px; color:var(--muted); }
+    input[type=search], select {
+      padding:10px 12px; border:1px solid var(--border); border-radius:9px;
+      background:#fff; color:var(--ink); font-size:14px; min-width:220px; }
+    input[type=search]:focus, select:focus { outline:2px solid var(--accent); border-color:var(--accent); }
+
+    button { border:none; border-radius:9px; padding:11px 20px; font-size:14px;
+             font-weight:600; cursor:pointer; transition:.15s; }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:var(--accent-d); }
+    .btn-excel { background:var(--green); color:#fff; display:inline-flex; align-items:center; gap:7px; }
+    .btn-excel:hover { filter:brightness(.92); }
+    button:disabled { opacity:.5; cursor:default; }
+    .spacer { flex:1; }
+
+    .status { color:var(--muted); font-size:13px; margin:0 2px 10px; min-height:18px; flex:none; }
+
+    .table-wrap { background:var(--panel); border:1px solid var(--border);
+                  border-radius:12px; overflow:hidden; box-shadow:var(--shadow);
+                  flex:1; min-height:0; display:flex; flex-direction:column; }
+    .scroll { overflow:auto; flex:1; min-height:0; }
+    table { width:100%; border-collapse:collapse; font-size:13.5px; }
+    thead th { background:#f1f5f9; color:#334155; font-weight:700; padding:12px 14px;
+               text-align:right; white-space:nowrap; position:sticky; top:0; z-index:1;
+               border-bottom:2px solid var(--border); }
+    tbody td { padding:11px 14px; text-align:right; border-bottom:1px solid var(--border);
+               white-space:nowrap; }
+    tbody tr:nth-child(even) td { background:var(--row); }
+    tbody tr:hover td { background:#ecfdf5; }
+    .price { color:var(--green); font-weight:700; }
+    .en { color:var(--muted); direction:ltr; text-align:left; font-size:12.5px; }
+    .company-tag { background:#e0f2fe; color:#075985; padding:3px 9px; border-radius:20px; font-size:12px; }
+    .alt-badge { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; padding:3px 10px;
+                 border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; }
+    .alt-badge:hover { background:#dcfce7; }
+    .alt-none { color:#cbd5e1; }
+    .more { text-align:center; padding:14px; color:var(--muted); font-size:13px; }
+    .empty { text-align:center; padding:50px; color:var(--muted); }
+
+    /* ====== التجاوب ====== */
+    @media (max-width:860px) {
+      header { padding:18px 18px; }
+      header h1 { font-size:19px; }
+      .wrap { padding:14px; }
+      .stats { grid-template-columns:repeat(2,1fr); gap:10px; }
+      .stat { padding:13px 14px; }
+      .stat .n { font-size:21px; }
+      .toolbar { gap:10px; }
+      .toolbar .spacer { display:none; }
+      .field { flex:1; min-width:140px; }
+      .field input, .field select { min-width:0; width:100%; }
+      #load, #export { flex:1 1 100%; }
+    }
+
+    /* على الجوال: تحويل صفوف الجدول إلى بطاقات (مع إبقاء التمرير داخليًا) */
+    @media (max-width:640px) {
+      table, thead, tbody, tr, td { display:block; width:100%; }
+      thead { display:none; }
+      tbody tr { background:#fff !important; border:1px solid var(--border);
+                 border-radius:12px; margin-bottom:12px; padding:6px 4px; box-shadow:var(--shadow); }
+      tbody tr:hover td { background:transparent; }
+      tbody td { border:none; border-bottom:1px solid #f1f5f9; white-space:normal;
+                 display:flex; justify-content:space-between; gap:12px; padding:9px 14px; }
+      tbody td:last-child { border-bottom:none; }
+      tbody td::before { content:attr(data-label); color:var(--muted);
+                         font-size:12px; font-weight:600; flex-shrink:0; }
+      tbody td.en { text-align:left; direction:ltr; }
+      tbody td:first-child { background:#f8fafc; border-radius:10px 10px 0 0;
+                             font-weight:700; color:var(--accent-d); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>💊 كتالوج الأدوية</h1>
+    <p>المصدر: POST /pharma/v2/products/sync — بحث وفلترة وتصدير</p>
+  </header>
+
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat"><div class="n" id="s-total">—</div><div class="l">إجمالي الأدوية</div></div>
+      <div class="stat"><div class="n" id="s-shown">—</div><div class="l">نتائج الفلترة</div></div>
+      <div class="stat"><div class="n" id="s-companies">—</div><div class="l">عدد الشركات</div></div>
+      <div class="stat"><div class="n" id="s-updated" style="font-size:14px">—</div><div class="l">آخر تحديث للبيانات</div></div>
+    </div>
+
+    <div class="toolbar">
+      <button id="load" class="btn-primary">عرض الكتالوج</button>
+      <div class="field">
+        <label>بحث</label>
+        <input type="search" id="search" placeholder="الاسم / الباركود…" disabled />
+      </div>
+      <div class="field">
+        <label>الشركة</label>
+        <select id="company" disabled><option value="">كل الشركات</option></select>
+      </div>
+      <div class="spacer"></div>
+      <button id="export" class="btn-excel" disabled>⬇ تصدير Excel</button>
+    </div>
+
+    <div class="status" id="status">اضغط «عرض الكتالوج» لتحميل البيانات.</div>
+    <div id="altbar" style="display:none;flex:none;align-items:center;gap:12px;background:#ecfeff;
+         border:1px solid #a5f3fc;color:#075985;border-radius:10px;padding:10px 14px;margin-bottom:10px;">
+      <span id="altbar-text" style="flex:1;font-size:14px;"></span>
+      <button class="btn-primary" id="altbar-back" style="padding:7px 16px;">⟵ رجوع لكل الأدوية</button>
+    </div>
+
+    <div class="table-wrap">
+      <div class="scroll" id="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>الاسم</th><th>الاسم الإنجليزي</th><th>الباركود</th>
+              <th>السعر</th><th>الشركة</th><th>البدائل</th><th>الاستخدام</th><th>الجرعة</th><th>التركيب</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="more" id="more"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PAGE = 300;
+    let all = [], filtered = [], shown = 0;
+    let altIndex = new Map();   // التركيب المُطَبَّع -> مصفوفة الأدوية
+    let altFilter = null;       // عند عرض بدائل دواء محدد
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const bc  = (b) => String(b ?? '').replace(/,+$/, '');
+    const fmt = (n) => Number(n).toLocaleString('ar-EG');
+    // تطبيع التركيب للمطابقة: حروف صغيرة، توحيد المسافات
+    const normForm = (f) => String(f ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+    function buildAltIndex() {
+      altIndex = new Map();
+      for (const x of all) {
+        const k = normForm(x.form);
+        if (!k) continue;
+        if (!altIndex.has(k)) altIndex.set(k, []);
+        altIndex.get(k).push(x);
+      }
+    }
+    // عدد البدائل الأخرى لدواء (باستثناء نفسه)
+    const altCount = (x) => {
+      const k = normForm(x.form);
+      return k && altIndex.has(k) ? altIndex.get(k).length - 1 : 0;
+    };
+
+    function render(reset) {
+      if (reset) { $('rows').innerHTML = ''; shown = 0; }
+      const slice = filtered.slice(shown, shown + PAGE);
+      $('rows').insertAdjacentHTML('beforeend', slice.map((x, i) => {
+        const n = altCount(x);
+        const altCell = n > 0
+          ? `<span class="alt-badge" data-form="${esc(normForm(x.form))}">${fmt(n)} بدائل</span>`
+          : `<span class="alt-none">—</span>`;
+        return `
+        <tr>
+          <td data-label="#">${shown + i + 1}</td>
+          <td data-label="الاسم">${esc(x.name)}</td>
+          <td class="en" data-label="الاسم الإنجليزي">${esc(x.nameEn)}</td>
+          <td data-label="الباركود">${esc(bc(x.barcode))}</td>
+          <td class="price" data-label="السعر">${esc(x.price)}</td>
+          <td data-label="الشركة"><span class="company-tag">${esc(x.company)}</span></td>
+          <td data-label="البدائل">${altCell}</td>
+          <td data-label="الاستخدام">${esc(x.uses)}</td>
+          <td data-label="الجرعة">${esc(x.dosage)}</td>
+          <td class="en" data-label="التركيب">${esc(x.form)}</td>
+        </tr>`;
+      }).join(''));
+      shown += slice.length;
+      $('more').textContent = shown < filtered.length
+        ? `عرض ${fmt(shown)} من ${fmt(filtered.length)} — مرّر لأسفل للمزيد`
+        : (filtered.length ? `كل النتائج (${fmt(filtered.length)})` : '');
+      $('rows').innerHTML || ($('rows').innerHTML = '');
+    }
+
+    function applyFilter() {
+      // وضع عرض بدائل دواء محدد
+      if (altFilter) {
+        filtered = (altIndex.get(altFilter) || []).slice()
+          .sort((a, b) => (Number(a.price)||0) - (Number(b.price)||0)); // الأرخص أولًا
+        $('s-shown').textContent = fmt(filtered.length);
+        render(true);
+        return;
+      }
+      const q = $('search').value.trim().toLowerCase();
+      const co = $('company').value;
+      filtered = all.filter(x => {
+        if (co && x.company !== co) return false;
+        if (!q) return true;
+        return [x.name, x.nameEn, x.barcode].some(v => String(v||'').toLowerCase().includes(q));
+      });
+      $('s-shown').textContent = fmt(filtered.length);
+      $('status').textContent = `النتائج: ${fmt(filtered.length)} من ${fmt(all.length)}`;
+      render(true);
+    }
+
+    // عرض بدائل دواء (نفس التركيب)، مرتبة من الأرخص
+    function showAlternatives(formKey) {
+      altFilter = formKey;
+      const group = altIndex.get(formKey) || [];
+      $('altbar').style.display = 'flex';
+      $('altbar-text').innerHTML =
+        `البدائل حسب التركيب: <b>${esc(formKey)}</b> — ${fmt(group.length)} دواء (مرتبة من الأرخص)`;
+      $('status').textContent = `عرض البدائل: ${fmt(group.length)} دواء بنفس التركيب`;
+      applyFilter();
+    }
+    function clearAlternatives() {
+      altFilter = null;
+      $('altbar').style.display = 'none';
+      applyFilter();
+    }
+
+    function fillCompanies() {
+      const counts = {};
+      for (const x of all) { const c = x.company || '—'; counts[c] = (counts[c]||0)+1; }
+      const names = Object.keys(counts).sort((a,b)=>a.localeCompare(b,'ar'));
+      $('company').innerHTML = '<option value="">كل الشركات</option>' +
+        names.map(n => `<option value="${esc(n)}">${esc(n)} (${counts[n]})</option>`).join('');
+      $('s-companies').textContent = fmt(names.length);
+    }
+
+    // تصدير النتائج المفلترة إلى ملف Excel (CSV مع BOM لدعم العربية)
+    function exportExcel() {
+      const cols = [
+        ['الاسم','name'], ['الاسم الإنجليزي','nameEn'], ['الباركود', r=>bc(r.barcode)],
+        [السعر,price], [الشركة,company], ['الاستخدام','uses'],
+        ['الجرعة','dosage'], ['التركيب','form'], ['العبوة','package'], ['الرمز','sako'],
+      ];
+      const cell = (v) => {
+        const s = String(v ?? '');
+        return /[",\n;]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+      };
+      const lines = [cols.map(c => cell(c[0])).join(',')];
+      for (const r of filtered)
+        lines.push(cols.map(c => cell(typeof c[1]==='function' ? c[1](r) : r[c[1]])).join(','));
+      const blob = new Blob(['﻿' + lines.join('\r\n')], { type:'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `catalog_${filtered.length}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    $('load').addEventListener('click', async () => {
+      $('load').disabled = true;
+      $('status').textContent = 'جارٍ جلب الكتالوج…';
+      try {
+        const r = await fetch('/api/products?all=true');
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'خطأ في الخادم');
+        all = d.items || [];
+        buildAltIndex();
+        altFilter = null; $('altbar').style.display = 'none';
+        $('s-total').textContent = fmt(all.length);
+        $('s-updated').textContent = (d.generated_at_utc || '-').replace('T',' ').replace(/\..*/,'');
+        fillCompanies();
+        ['search','company','export'].forEach(id => $(id).disabled = false);
+        $('load').textContent = 'إعادة التحميل';
+        $('load').disabled = false;
+        applyFilter();
+      } catch (e) {
+        $('status').textContent = 'فشل الجلب: ' + e.message;
+        $('load').disabled = false;
+      }
+    });
+
+    $('search').addEventListener('input', () => { altFilter = null; $('altbar').style.display='none'; applyFilter(); });
+    $('company').addEventListener('change', () => { altFilter = null; $('altbar').style.display='none'; applyFilter(); });
+    $('export').addEventListener('click', exportExcel);
+    $('altbar-back').addEventListener('click', clearAlternatives);
+    // الضغط على شارة البدائل
+    $('rows').addEventListener('click', (e) => {
+      const b = e.target.closest('.alt-badge');
+      if (b) showAlternatives(b.getAttribute('data-form'));
+    });
+
+    function maybeLoadMore() {
+      if (shown >= filtered.length) return;
+      const el = $('scroll');
+      // سطح المكتب: تمرير داخل الحاوية — الجوال: تمرير النافذة
+      const innerNear = el.scrollTop + el.clientHeight >= el.scrollHeight - 300;
+      const winNear = window.innerHeight + window.scrollY >= document.body.offsetHeight - 400;
+      if (innerNear || winNear) render(false);
+    }
+    $('scroll').addEventListener('scroll', maybeLoadMore);
+    window.addEventListener('scroll', maybeLoadMore);
+  </script>
+</body>
+</html>

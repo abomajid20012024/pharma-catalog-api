@@ -1,0 +1,17 @@
+{
+  "name": "pharma-catalog-api",
+  "version": "1.0.0",
+  "description": "API وسيط لكتالوج الأدوية — يجلب البيانات من المصدر ويقدّمها JSON نظيف مع بحث وبدائل",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:xlsx": "node build-xlsx.js",
+    "build:artifact": "node generate-artifact.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["pharma", "api", "proxy", "catalog", "medicine", "arabic"],
+  "license": "MIT",
+  "dependencies": {}
+}

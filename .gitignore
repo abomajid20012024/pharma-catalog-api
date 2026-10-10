@@ -1,0 +1,14 @@
+node_modules/
+*.log
+.env
+.DS_Store
+
+# ملفات مُولّدة محليًا (كبيرة / لقطات بيانات)
+_c.json
+sync.bin
+sync.json
+الأدوية_الكامل.xlsx
+artifact.html
+
+# ملفات Excel المؤقتة
+~$*
