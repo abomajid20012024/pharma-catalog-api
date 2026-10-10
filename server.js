@@ -35,9 +35,10 @@ function clean(v) {
 const normForm = (f) => String(f ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 // ------------------------------------------------------------ جلب المصدر
-function fetchUpstream() {
+// stateBody: {state:'empty'} لمزامنة كاملة، أو {state:'has_data', last_sync_utc} لتزايدية
+function fetchUpstream(stateBody) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ state: 'empty' });
+    const body = JSON.stringify(stateBody || { state: 'empty' });
     const u = new URL(UPSTREAM);
     const req = https.request({
       hostname: u.hostname,
@@ -72,8 +73,9 @@ const cache = {
   loading: null,
 };
 
-function processSnapshot(snap) {
-  const items = (snap.items || []).map((x) => ({
+// تحويل عنصر خام من المصدر إلى الشكل النظيف الموحّد
+function mapItem(x) {
+  return {
     sako: clean(x.sako),
     barcode: clean(String(x.barcode ?? '').replace(/,+$/, '')),
     name: clean(x.name),
@@ -86,7 +88,11 @@ function processSnapshot(snap) {
     company: clean(x.company_name),
     fact: x.fact ?? null,
     updated_at: x.updated_at_utc || null,
-  }));
+  };
+}
+
+function processSnapshot(snap) {
+  const items = (snap.items || []).map(mapItem);
 
   const byBarcode = new Map();
   const altIndex = new Map();
@@ -184,6 +190,7 @@ const server = http.createServer(async (req, res) => {
           'GET /api/products': 'المنتجات (q, company, barcode, limit, offset, all)',
           'GET /api/products/:barcode': 'منتج واحد بالباركود',
           'GET /api/alternatives/:barcode': 'بدائل الدواء (نفس التركيب) مرتّبة من الأرخص',
+          'GET /api/sync': 'مزامنة للطرف الثالث: كاملة (بلا since) أو تزايدية (?since=<cursor>)',
           'GET /api/refresh': 'إعادة جلب البيانات من المصدر فورًا',
         },
       });
@@ -201,6 +208,37 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/refresh') {
       await ensureData(true);
       return sendJSON(res, 200, { ok: true, refreshed: true, ...cache.meta });
+    }
+
+    // مزامنة للطرف الثالث: كاملة (بلا since) أو تزايدية (مع since/cursor)
+    // العميل يخزّن قيمة `cursor` ويمرّرها في الطلب التالي عبر ?since=<cursor>
+    if (p === '/api/sync') {
+      const since = qp.get('since') || qp.get('last_sync_utc');
+      if (since) {
+        // تزايدية: نمرّر بروتوكول المصدر الرسمي (state=has_data)
+        const snap = await fetchUpstream({ state: 'has_data', last_sync_utc: since });
+        const items = (snap.items || []).map(mapItem);
+        return sendJSON(res, 200, {
+          ok: true,
+          mode: 'delta',
+          since,
+          cursor: snap.next_sync_utc || since, // المؤشّر للمزامنة التالية
+          server_time: new Date().toISOString(),
+          count: items.length,
+          items,
+          note: 'المصدر لا يبلّغ عن المحذوفات؛ أعد مزامنة كاملة دوريًا للتنظيف.',
+        });
+      }
+      // كاملة: من الكاش
+      await ensureData();
+      return sendJSON(res, 200, {
+        ok: true,
+        mode: 'full',
+        cursor: cache.meta.next_sync_utc || cache.meta.generated_at_utc,
+        server_time: new Date().toISOString(),
+        count: cache.items.length,
+        items: cache.items,
+      });
     }
 
     // كل ما يلي يحتاج بيانات
